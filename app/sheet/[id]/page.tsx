@@ -6,7 +6,7 @@ import {
 } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { Plus, List, Star, Folder, Cloud, Lock, ChevronDown } from 'lucide-react';
+import { Plus, List, Star, Folder, Cloud, Lock, ChevronDown, Printer } from 'lucide-react';
 import SpreadsheetGrid from '@/components/spreadsheet/Grid';
 import SheetsIcon from '@/components/icons/SheetsIcon';
 import { MasterDataRow, CellAddress } from '@/components/spreadsheet/types';
@@ -510,6 +510,19 @@ export default function SheetEditorPage() {
           if (editingCell) cancelEdit();
         }}
       />
+
+      {(activeSheet === '外协' || activeSheet === '出货') && (
+        <button
+          onClick={() => {
+            const mode = activeSheet === '外协' ? 'outsourcing' : 'shipping';
+            window.open(`/sheet/${sheetId}/print/${mode}`, '_blank');
+          }}
+          className="fixed bottom-4 right-4 rounded-full bg-white/90 p-3 shadow-lg border hover:bg-white"
+          aria-label="Print"
+        >
+          <Printer className="h-5 w-5" />
+        </button>
+      )}
     </div>
   );
 }
