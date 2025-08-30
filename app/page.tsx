@@ -2,20 +2,20 @@
 "use client";
 
 import type { NextPage } from 'next';
-import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { 
-  Menu, 
-  Search, 
-  Grip, 
-  ArrowUpDown, 
-  MoreVertical, 
-  Rows3, 
+import {
+  Menu,
+  Search,
+  Grip,
+  ArrowUpDown,
+  MoreVertical,
+  Rows3,
   Folder,
   ChevronDown
 } from 'lucide-react';
 import SheetsIcon from '@/components/icons/SheetsIcon';
+import Sidebar from '@/components/Sidebar';
 
 // --- Custom SVG Icons for Logos ---
 
@@ -71,6 +71,7 @@ const SheetsHomePage: NextPage = () => {
   const [activeIdx, setActiveIdx] = useState<number>(-1);
   const [searching, setSearching] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const refresh = async () => {
     setLoading(true);
@@ -105,7 +106,9 @@ const SheetsHomePage: NextPage = () => {
     const h = setTimeout(async () => {
       try {
         const res = await fetch(`/api/sheets?q=${encodeURIComponent(query.trim())}`, { cache: 'no-store' });
-        const data = await res.json().catch(() => ({} as any));
+        const data = (await res
+          .json()
+          .catch(() => ({}) as { items?: Array<{ id: string; title: string; updated_at: string }> }));
         if (!cancelled) {
           setResults(Array.isArray(data.items) ? data.items : []);
           setActiveIdx(-1);
@@ -122,10 +125,12 @@ const SheetsHomePage: NextPage = () => {
       {/* Header */}
       <header className="flex items-center justify-between p-2 pl-4 pr-4 border-b border-gray-200 bg-white sticky top-0 z-10">
         <div className="flex items-center gap-4">
-          <Menu size={24} className="text-gray-600" />
+          <button aria-label="Open menu" onClick={() => setSidebarOpen(true)}>
+            <Menu size={24} className="text-gray-600" />
+          </button>
           <div className="flex items-center gap-2">
             <SheetsIcon />
-            <span className="text-xl text-gray-700 hidden sm:inline">Sheets</span>
+            <span className="text-xl text-gray-700 hidden sm:inline">Eldaline Sheets</span>
           </div>
         </div>
         
@@ -262,6 +267,7 @@ const SheetsHomePage: NextPage = () => {
           <div className="h-12 w-12 rounded-full border-4 border-gray-200 border-t-[#1A73E8] animate-spin" />
         </div>
       )}
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
     </div>
   );
 };
