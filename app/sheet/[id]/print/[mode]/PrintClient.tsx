@@ -1,11 +1,36 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type { SheetRow } from '@/lib/db';
 
 export default function PrintClient({ sheet, mode }: { sheet: SheetRow; mode: 'outsourcing' | 'shipping'; }) {
+  const printedRef = useRef(false);
   useEffect(() => {
-    window.print();
+    if (printedRef.current) return;
+    printedRef.current = true;
+
+    const closeSelf = () => {
+      try {
+        // Give the browser a beat to settle focus first
+        setTimeout(() => window.close(), 0);
+      } catch {}
+    };
+
+    const afterPrint = () => closeSelf();
+    const media = window.matchMedia('print');
+    const onMedia = (e: MediaQueryListEvent) => { if (!e.matches) closeSelf(); };
+
+    window.addEventListener('afterprint', afterPrint);
+    try { media.addEventListener('change', onMedia); } catch { /* older browsers */ }
+
+    // Slight delay helps Safari/Chrome stabilize before printing
+    const id = setTimeout(() => { try { window.print(); } catch {} }, 50);
+
+    return () => {
+      clearTimeout(id);
+      window.removeEventListener('afterprint', afterPrint);
+      try { media.removeEventListener('change', onMedia); } catch {}
+    };
   }, []);
 
   const rows = sheet.data.masterData.filter(r => {

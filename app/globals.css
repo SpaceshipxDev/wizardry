@@ -45,3 +45,17 @@ body {
 .cell-header {
   @apply sticky text-xs font-medium text-gray-600 bg-gray-100 border-r border-b border-gray-300 flex items-center justify-center;
 }
+
+/* Minimal, elegant dot to indicate global (reused) fields */
+.global-indicator {
+  @apply inline-block align-middle rounded-full w-1.5 h-1.5;
+  background-color: #34C759; /* Apple-esque green */
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.9) inset;
+}
+
+/* Soft, elegant glow for sheet-specific columns when switching views */
+.sheet-specific-glow {
+  /* Large inset overlay to avoid fighting with bg utilities */
+  box-shadow: inset 0 0 0 9999px rgba(253, 230, 138, 0.28), 0 0 0 1px rgba(253, 230, 138, 0.35);
+  transition: box-shadow 240ms ease;
+}

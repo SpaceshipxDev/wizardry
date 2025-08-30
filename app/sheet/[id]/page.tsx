@@ -6,7 +6,7 @@ import {
 } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { Plus, List, Star, Folder, Cloud, Lock, ChevronDown, Printer } from 'lucide-react';
+import { Plus, List, Star, Folder, Cloud, Lock, ChevronDown, Printer, LayoutGrid } from 'lucide-react';
 import SpreadsheetGrid from '@/components/spreadsheet/Grid';
 import SheetsIcon from '@/components/icons/SheetsIcon';
 import { MasterDataRow, CellAddress } from '@/components/spreadsheet/types';
@@ -17,6 +17,22 @@ const sheetConfiguration = {
     columns: [
       { key: 'productImage', header: '产品图片' }, { key: 'productNumber', header: '产品编号' }, { key: 'productName', header: '产品名称' },
       { key: 'material', header: '材质' }, { key: 'surfaceFinish', header: '表面处理' },
+      { key: 'quantity', header: '数量' }, { key: 'remarks', header: '备注' },
+    ]
+  },
+  '报价': {
+    columns: [
+      { key: 'productImage', header: '产品图片' }, { key: 'productNumber', header: '产品编号' }, { key: 'productName', header: '产品名称' },
+      { key: 'material', header: '材质' }, { key: 'surfaceFinish', header: '表面处理' },
+      { key: 'quantity', header: '数量' }, { key: 'unitPrice', header: '单价' }, { key: 'totalPrice', header: '总价' },
+      { key: 'remarks', header: '备注' },
+    ]
+  },
+  '生产': {
+    columns: [
+      { key: 'productImage', header: '产品图片' }, { key: 'productNumber', header: '产品编号' }, { key: 'productName', header: '产品名称' },
+      { key: 'material', header: '材质' }, { key: 'surfaceFinish', header: '表面处理' },
+      { key: 'processingMethod', header: '加工方式' }, { key: 'processRequirements', header: '工艺要求' },
       { key: 'quantity', header: '数量' }, { key: 'remarks', header: '备注' },
     ]
   },
@@ -37,6 +53,16 @@ const sheetConfiguration = {
   }
 };
 type SheetName = keyof typeof sheetConfiguration;
+
+// Derive which column keys are reused across multiple sheets ("global" fields)
+const REUSED_COLUMN_KEYS: Set<string> = (() => {
+  const counts: Record<string, number> = {};
+  (Object.keys(sheetConfiguration) as SheetName[]).forEach((name) => {
+    const cols = sheetConfiguration[name].columns;
+    cols.forEach((c) => { counts[c.key] = (counts[c.key] ?? 0) + 1; });
+  });
+  return new Set(Object.keys(counts).filter((k) => counts[k] > 1));
+})();
 
 // --- Types for the metadata panel ---
 type ComprehensiveData = { salesOrderNumber: string; customerName: string; contactPerson: string; dueDate: string };
@@ -68,7 +94,21 @@ type ShippingOrderData = {
 // --- Helpers ---
 const NUM_ROWS_TOTAL = 100;
 const makeBlankRows = (): MasterDataRow[] => Array.from({ length: NUM_ROWS_TOTAL }, () => ({
-  productImage: '', productNumber: '', productName: '', material: '', surfaceFinish: '', quantity: '', remarks: '', isOutsourced: false,
+  productImage: '',
+  productNumber: '',
+  productName: '',
+  material: '',
+  surfaceFinish: '',
+  quantity: '',
+  remarks: '',
+  // Quotation
+  unitPrice: '',
+  totalPrice: '',
+  // Production
+  processingMethod: '',
+  processRequirements: '',
+  // Outsourcing
+  isOutsourced: false,
 }));
 
 export default function SheetEditorPage() {
@@ -82,6 +122,7 @@ export default function SheetEditorPage() {
   const [loaded, setLoaded] = useState(false);
   const [masterData, setMasterData] = useState<MasterDataRow[]>(makeBlankRows());
   const [activeSheet, setActiveSheet] = useState<SheetName>('综合');
+  const [highlightSpecific, setHighlightSpecific] = useState<boolean>(false);
 
   // --- Metadata State ---
   const [comprehensiveData, setComprehensiveData] = useState<ComprehensiveData>({ salesOrderNumber: '', customerName: '', contactPerson: '', dueDate: '' });
@@ -426,7 +467,25 @@ export default function SheetEditorPage() {
     });
   };
 
-  useEffect(() => { const up = () => setIsDragging(false); window.addEventListener('mouseup', up); return () => window.removeEventListener('mouseup', up); }, []);
+  // Robustly cancel dragging on pointer up, tab switch, or visibility changes
+  useEffect(() => {
+    const endDrag = () => setIsDragging(false);
+    const onVisibility = () => { if (document.visibilityState !== 'visible') endDrag(); };
+
+    window.addEventListener('mouseup', endDrag);
+    window.addEventListener('pointerup', endDrag);
+    window.addEventListener('blur', endDrag);
+    window.addEventListener('pagehide', endDrag);
+    document.addEventListener('visibilitychange', onVisibility);
+
+    return () => {
+      window.removeEventListener('mouseup', endDrag);
+      window.removeEventListener('pointerup', endDrag);
+      window.removeEventListener('blur', endDrag);
+      window.removeEventListener('pagehide', endDrag);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, []);
   useEffect(() => { if (!editingCell) gridContainerRef.current?.focus(); }, [activeCell, editingCell]);
   useEffect(() => () => {
     masterData.forEach(row => {
@@ -436,23 +495,57 @@ export default function SheetEditorPage() {
     });
   }, [masterData]);
 
-  // Loading screen to avoid visual glitching while fetching/initializing
-  if (!loaded) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="h-12 w-12 rounded-full border-4 border-gray-200 border-t-[#1A73E8] animate-spin" />
-      </div>
-    );
-  }
+  // After returning from print/dialog or tab switch, force a lightweight repaint
+  // to avoid rare compositor glitches (seen on macOS/Chrome/Safari with many sticky cells)
+  useEffect(() => {
+    const forceRepaint = () => {
+      if (document.visibilityState !== 'visible') return;
+      const el = gridContainerRef.current;
+      if (!el) return;
+      const prevWill = el.style.willChange;
+      const prevTransform = el.style.transform;
+      try {
+        el.style.willChange = 'transform';
+        el.style.transform = 'translateZ(0)';
+        // Force reflow
+        void el.offsetHeight;
+        requestAnimationFrame(() => {
+          el.style.willChange = prevWill;
+          el.style.transform = prevTransform;
+        });
+      } catch {}
+    };
+    window.addEventListener('focus', forceRepaint);
+    document.addEventListener('visibilitychange', forceRepaint);
+    return () => {
+      window.removeEventListener('focus', forceRepaint);
+      document.removeEventListener('visibilitychange', forceRepaint);
+    };
+  }, []);
+
+  // Derive sheet-specific column keys each render based on active sheet
+  const sheetSpecificKeys = new Set(visibleColumns.filter(c => !REUSED_COLUMN_KEYS.has(c.key)).map(c => c.key));
+
+  // When active sheet changes, briefly highlight sheet-specific columns
+  useEffect(() => {
+    setHighlightSpecific(true);
+    const t = setTimeout(() => setHighlightSpecific(false), 2000);
+    return () => clearTimeout(t);
+  }, [activeSheet]);
 
   return (
     <div
-      className="flex flex-col h-screen bg-gray-100 text-sm outline-none"
+      className="relative flex flex-col h-screen bg-gray-100 text-sm outline-none"
       ref={gridContainerRef}
       tabIndex={0}
       onKeyDown={handleGridKeyDown}
       onPaste={handleGridPaste}
     >
+      {!loaded && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-white">
+          <div className="h-12 w-12 rounded-full border-4 border-gray-200 border-t-[#1A73E8] animate-spin" />
+        </div>
+      )}
       <Header
         title={title}
         editingTitle={editingTitle}
@@ -480,10 +573,13 @@ export default function SheetEditorPage() {
         onCommit={commitEdit}
       />
 
-      <div className="flex-grow overflow-auto min-h-0">
+      <div className="flex-grow overflow-auto min-h-0" onMouseLeave={() => setIsDragging(false)}>
         <SpreadsheetGrid
           numRows={NUM_ROWS_TOTAL}
           visibleColumns={visibleColumns}
+          reusedColumnKeys={REUSED_COLUMN_KEYS}
+          sheetSpecificColumnKeys={sheetSpecificKeys}
+          highlightSpecific={highlightSpecific}
           masterData={masterData}
           activeCell={activeCell}
           editingCell={editingCell}
@@ -514,13 +610,15 @@ export default function SheetEditorPage() {
       {(activeSheet === '外协' || activeSheet === '出货') && (
         <button
           onClick={() => {
+            // Ensure we aren't in a drag/select state before opening print
+            setIsDragging(false);
             const mode = activeSheet === '外协' ? 'outsourcing' : 'shipping';
             window.open(`/sheet/${sheetId}/print/${mode}`, '_blank');
           }}
           className="fixed bottom-4 right-4 rounded-full bg-white/90 p-3 shadow-lg border hover:bg-white"
           aria-label="Print"
         >
-          <Printer className="h-5 w-5" />
+          <Printer className="h-5 w-5 text-black" />
         </button>
       )}
     </div>
@@ -624,10 +722,10 @@ const MetadataPanel = ({
           </button>
         )}
         <div className="grid grid-cols-4 gap-x-6 gap-y-3 flex-1">
-          <MetaField label="销售单号" value={comprehensiveData.salesOrderNumber} onChange={v => setComprehensiveData({ ...comprehensiveData, salesOrderNumber: v })} />
-          <MetaField label="客户名称" value={comprehensiveData.customerName} onChange={v => setComprehensiveData({ ...comprehensiveData, customerName: v })} />
-          <MetaField label="联系人" value={comprehensiveData.contactPerson} onChange={v => setComprehensiveData({ ...comprehensiveData, contactPerson: v })} />
-          <MetaDateField label="交期" value={comprehensiveData.dueDate} onChange={v => setComprehensiveData({ ...comprehensiveData, dueDate: v })} />
+          <MetaField isGlobal label="销售单号" value={comprehensiveData.salesOrderNumber} onChange={v => setComprehensiveData({ ...comprehensiveData, salesOrderNumber: v })} />
+          <MetaField isGlobal label="客户名称" value={comprehensiveData.customerName} onChange={v => setComprehensiveData({ ...comprehensiveData, customerName: v })} />
+          <MetaField isGlobal label="联系人" value={comprehensiveData.contactPerson} onChange={v => setComprehensiveData({ ...comprehensiveData, contactPerson: v })} />
+          <MetaDateField isGlobal label="交期" value={comprehensiveData.dueDate} onChange={v => setComprehensiveData({ ...comprehensiveData, dueDate: v })} />
         </div>
       </div>
 
@@ -667,9 +765,14 @@ const MetadataPanel = ({
   );
 };
 
-const MetaField = ({ label, value, onChange, containerClassName = "" }: { label: string; value: string; onChange: (v: string) => void; containerClassName?: string }) => (
+const MetaField = ({ label, value, onChange, isGlobal = false, containerClassName = "" }: { label: string; value: string; onChange: (v: string) => void; isGlobal?: boolean; containerClassName?: string }) => (
   <div className={`flex items-center gap-2 ${containerClassName}`}>
-    <label className="text-xs font-medium text-gray-500 whitespace-nowrap">{label}:</label>
+    <label className="text-xs font-medium text-gray-500 whitespace-nowrap">
+      <span className="inline-flex items-center gap-1.5" title={isGlobal ? 'Global field' : undefined}>
+        {isGlobal && <span className="global-indicator" aria-label="Global field" />}
+        {label}:
+      </span>
+    </label>
     <input
       type="text"
       value={value}
@@ -680,9 +783,14 @@ const MetaField = ({ label, value, onChange, containerClassName = "" }: { label:
   </div>
 );
 
-const MetaDateField = ({ label, value, onChange, containerClassName = "" }: { label: string; value: string; onChange: (v: string) => void; containerClassName?: string }) => (
+const MetaDateField = ({ label, value, onChange, isGlobal = false, containerClassName = "" }: { label: string; value: string; onChange: (v: string) => void; isGlobal?: boolean; containerClassName?: string }) => (
   <div className={`flex items-center gap-2 ${containerClassName}`}>
-    <label className="text-xs font-medium text-gray-500 whitespace-nowrap">{label}:</label>
+    <label className="text-xs font-medium text-gray-500 whitespace-nowrap">
+      <span className="inline-flex items-center gap-1.5" title={isGlobal ? 'Global field' : undefined}>
+        {isGlobal && <span className="global-indicator" aria-label="Global field" />}
+        {label}:
+      </span>
+    </label>
     <input
       type="date"
       value={value}
@@ -711,23 +819,36 @@ const FormulaBar = ({
 
 const Footer = ({
   sheets, activeSheet, setActiveSheet
-}: { sheets: SheetName[], activeSheet: SheetName, setActiveSheet: (s: SheetName) => void }) => (
-  <footer className="flex-shrink-0 bg-white p-1.5 border-t flex items-center shadow-inner">
-    <button className="p-1.5 rounded hover:bg-gray-200"><Plus size={20} /></button>
-    <div className="h-5 w-px bg-gray-300 mx-1" />
-    {sheets.map(name => (
-      <button
-        key={name}
-        onClick={() => setActiveSheet(name)}
-        className={`px-4 py-1.5 text-sm font-medium transition-colors ${
-          activeSheet === name ? 'text-green-700 border-b-2 border-green-600' : 'text-gray-600 hover:bg-gray-200 rounded-md'
-        }`}
-      >
-        {name}
-      </button>
-    ))}
-    <div className="ml-auto">
-      <button className="p-1.5 rounded hover:bg-gray-200"><List size={18} /></button>
-    </div>
-  </footer>
-);
+}: { sheets: SheetName[], activeSheet: SheetName, setActiveSheet: (s: SheetName) => void }) => {
+  const first = sheets[0];
+  const rest = sheets.slice(1);
+
+  const Tab = ({ name }: { name: SheetName }) => (
+    <button
+      onClick={() => setActiveSheet(name)}
+      className={`px-4 py-1.5 text-sm font-medium transition-colors ${
+        activeSheet === name ? 'text-gray-900 border-b-2 border-gray-900' : 'text-gray-600 hover:bg-gray-200 rounded-md'
+      }`}
+    >
+      {name}
+    </button>
+  );
+
+  return (
+    <footer className="flex-shrink-0 bg-white p-1.5 border-t flex items-center shadow-inner">
+      <button className="p-1.5 rounded hover:bg-gray-200" title="Add sheet"><Plus size={20} /></button>
+      <div className="h-5 w-px bg-gray-300 mx-1" />
+      {first && <Tab name={first as SheetName} />}
+      {/* Elegant separator using LayoutGrid icon */}
+      <div className="mx-5 flex items-center justify-center text-gray-400" aria-hidden="true">
+        <LayoutGrid size={22} strokeWidth={1.6} />
+      </div>
+      {rest.map((name) => (
+        <Tab key={name} name={name as SheetName} />
+      ))}
+      <div className="ml-auto">
+        <button className="p-1.5 rounded hover:bg-gray-200" title="Sheet list"><List size={18} /></button>
+      </div>
+    </footer>
+  );
+};

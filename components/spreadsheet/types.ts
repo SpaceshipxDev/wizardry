@@ -11,6 +11,12 @@ export type MasterDataRow = {
   surfaceFinish: CellValue;
   quantity: CellValue;
   remarks: CellValue;
+  // Quotation-specific
+  unitPrice?: CellValue; // 单价
+  totalPrice?: CellValue; // 总价
+  // Production-specific
+  processingMethod?: CellValue; // 加工方式
+  processRequirements?: CellValue; // 工艺要求
   isOutsourced?: boolean;
 };
 

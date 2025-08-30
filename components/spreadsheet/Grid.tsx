@@ -8,6 +8,12 @@ import { MasterDataRow } from '@/components/spreadsheet/types';
 interface SpreadsheetGridProps {
   numRows: number;
   visibleColumns: { key: string; header: string }[];
+  // Set of column keys that are reused across views ("global")
+  reusedColumnKeys?: Set<string>;
+  // Set of column keys that are specific to the current sheet
+  sheetSpecificColumnKeys?: Set<string>;
+  // When true, briefly glow sheet-specific columns (on tab switch)
+  highlightSpecific?: boolean;
   masterData: MasterDataRow[];
   activeCell: { row: number; col: number };
   editingCell: { row: number; col: number } | null;
@@ -35,11 +41,21 @@ export default function SpreadsheetGrid(props: SpreadsheetGridProps) {
       {/* headers */}
       <div className="flex sticky top-0 z-20">
         <div className="cell-header w-12 h-10 flex-shrink-0 sticky left-0 z-10" />
-        {props.visibleColumns.map(c => (
-          <div key={c.key} className="cell-header w-32 h-10 flex-shrink-0 font-semibold">
-            {c.header}
-          </div>
-        ))}
+        {props.visibleColumns.map((c) => {
+          const isGlobal = props.reusedColumnKeys?.has(c.key) ?? false;
+          const isSpecific = props.sheetSpecificColumnKeys?.has(c.key) ?? false;
+          return (
+            <div
+              key={c.key}
+              className={`cell-header w-32 h-10 flex-shrink-0 font-semibold ${isSpecific && props.highlightSpecific ? 'sheet-specific-glow' : ''}`}
+            >
+              <div className="inline-flex items-center gap-1.5" title={isGlobal ? 'Global field' : undefined}>
+                {isGlobal && <span className="global-indicator" aria-label="Global field" />}
+                <span>{c.header}</span>
+              </div>
+            </div>
+          );
+        })}
         {/* Ghost headers for visual space */}
         {Array.from({ length: extraCols }).map((_, i) => (
           <div
@@ -65,11 +81,13 @@ export default function SpreadsheetGrid(props: SpreadsheetGridProps) {
             <div key={r} className="flex">
               {props.visibleColumns.map((col, c) => {
                 const key = col.key as keyof MasterDataRow;
+                const isSpecific = props.sheetSpecificColumnKeys?.has(col.key) ?? false;
                 return (
                   <Cell
                     key={`${r}-${c}`}
                     columnKey={key}
                     value={props.masterData[r]?.[key] ?? ''}
+                    isSheetSpecific={isSpecific && !!props.highlightSpecific}
                     isActive={props.activeCell.row === r && props.activeCell.col === c}
                     isInSelection={props.isCellInSelection(r, c)}
                     isEditing={!!props.editingCell && props.editingCell.row === r && props.editingCell.col === c}
@@ -108,6 +126,7 @@ type CellProps = {
   isInSelection: boolean;
   isEditing: boolean;
   editBuffer: string;
+  isSheetSpecific?: boolean;
 
   onMouseDown: (e: MouseEvent) => void;
   onMouseEnter: () => void;
@@ -126,6 +145,7 @@ function Cell({
   isInSelection,
   isEditing,
   editBuffer,
+  isSheetSpecific = false,
   onMouseDown,
   onMouseEnter,
   onDoubleClick,
@@ -164,7 +184,7 @@ function Cell({
   const classNames =
     `cell w-32 h-10 flex-shrink-0 p-1 overflow-hidden whitespace-nowrap
      bg-white text-black flex items-center justify-start
-     ${isInSelection ? 'in-selection' : ''} ${isActive ? 'selected' : ''}`;
+     ${isInSelection ? 'in-selection' : ''} ${isActive ? 'selected' : ''} ${isSheetSpecific ? 'sheet-specific-glow' : ''}`;
 
   // Checkbox column
   if (columnKey === 'isOutsourced') {
