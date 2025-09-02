@@ -234,7 +234,8 @@ function Cell({
       const isImg =
         v.startsWith('data:image') ||
         v.startsWith('blob:') ||
-        v.startsWith('/uploads/') ||
+        v.startsWith('/uploads/') || // legacy
+        v.startsWith('/file/') ||
         v.startsWith('http://') ||
         v.startsWith('https://');
       if (isImg) {
