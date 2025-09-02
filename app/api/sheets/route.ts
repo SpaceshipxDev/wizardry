@@ -22,7 +22,8 @@ export async function GET(req: NextRequest) {
         customerName = comp?.customerName || ship?.customerName || '';
         // Prefer comprehensive dueDate, fallback to shipping deliveryDate
         dueDate = comp?.dueDate || ship?.deliveryDate || '';
-        currentStage = (full.data as any)?.currentStage as string | undefined;
+        const cs = full.data?.currentStage;
+        currentStage = typeof cs === 'string' ? cs : undefined;
       }
     } catch {}
     return { ...row, customerName, dueDate, currentStage };

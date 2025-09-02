@@ -3,9 +3,25 @@ import path from 'path';
 import Database from 'better-sqlite3';
 import { randomUUID } from 'crypto';
 
+type StoredRow = {
+  productImage: string;
+  productNumber: string;
+  productName: string;
+  material: string;
+  surfaceFinish: string;
+  quantity: string | number;
+  remarks: string;
+  // Extras used in specific sheets
+  unitPrice?: string | number;
+  totalPrice?: string | number;
+  processingMethod?: string;
+  processRequirements?: string;
+  isOutsourced: boolean;
+};
+
 export type SheetData = {
   activeSheet: '综合' | '外协' | '出货';
-  masterData: any[]; // Grid rows
+  masterData: StoredRow[]; // Grid rows
   comprehensiveData: { salesOrderNumber: string; customerName: string; contactPerson: string; dueDate: string };
   outsourcingData: {
     counterpartName: string; // 对方名称
@@ -47,9 +63,19 @@ export type SheetRow = {
 const DB_DIR = path.join(process.cwd(), 'data');
 const DB_PATH = path.join(DB_DIR, 'sheetx.sqlite');
 
-function ensureDb(): any {
+interface DB {
+  pragma: (sql: string) => unknown;
+  exec: (sql: string) => unknown;
+  prepare: (sql: string) => {
+    run: (...args: unknown[]) => unknown;
+    all: (...args: unknown[]) => unknown;
+    get: (...args: unknown[]) => unknown;
+  };
+}
+
+function ensureDb(): DB {
   if (!fs.existsSync(DB_DIR)) fs.mkdirSync(DB_DIR, { recursive: true });
-  const db = new Database(DB_PATH);
+  const db = new (Database as unknown as { new (path: string): DB })(DB_PATH);
   db.pragma('journal_mode = WAL');
   db.exec(`
     CREATE TABLE IF NOT EXISTS sheets (
@@ -66,7 +92,7 @@ function ensureDb(): any {
 
 export function createDefaultSheetData(): SheetData {
   const NUM_ROWS_TOTAL = 100;
-  const blankRows = Array.from({ length: NUM_ROWS_TOTAL }, () => ({
+  const blankRows: StoredRow[] = Array.from({ length: NUM_ROWS_TOTAL }, () => ({
     productImage: '',
     productNumber: '',
     productName: '',

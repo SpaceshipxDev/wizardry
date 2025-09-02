@@ -2,7 +2,7 @@
 "use client";
 
 import type { NextPage } from "next";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Menu, Search, MoreVertical } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
@@ -101,13 +101,13 @@ const OperationsPage: NextPage = () => {
   useEffect(() => { void refresh(); }, []);
 
   // Helpers and grouping for tabs (今天交 / 明天交 / 延期)
-  const toDateOnly = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  const parseDue = (s?: string) => {
+  const toDateOnly = useCallback((d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()), []);
+  const parseDue = useCallback((s?: string) => {
     if (!s) return null;
     const d = new Date(s);
     if (isNaN(d.getTime())) return null;
     return toDateOnly(d).getTime();
-  };
+  }, [toDateOnly]);
   const todayMs = useMemo(() => toDateOnly(new Date()).getTime(), []);
   const tomorrowMs = useMemo(() => toDateOnly(new Date(Date.now() + 24 * 60 * 60 * 1000)).getTime(), []);
 
@@ -121,7 +121,7 @@ const OperationsPage: NextPage = () => {
       else if (due < todayMs) groups.overdue.push(it);
     }
     return groups;
-  }, [items, todayMs, tomorrowMs]);
+  }, [items, todayMs, tomorrowMs, parseDue]);
 
   const counts = useMemo(() => ({
     today: grouped.today.length,

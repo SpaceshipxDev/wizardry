@@ -10,7 +10,7 @@ export default function Footer({
 
   const Tab = ({ name }: { name: string }) => (
     <button
-      onClick={() => setActiveSheet(name as any)}
+      onClick={() => setActiveSheet(name)}
       className={`px-4 py-1.5 text-sm font-medium transition-colors ${
         activeSheet === name ? 'text-gray-900 border-b-2 border-gray-900' : 'text-gray-600 hover:bg-gray-200 rounded-md'
       }`}

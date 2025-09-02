@@ -1,13 +1,14 @@
 "use client";
 
 import {
-  useState, useRef, useEffect,
+  useState, useRef, useEffect, useCallback,
   KeyboardEvent, ClipboardEvent, MouseEvent
 } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Printer } from 'lucide-react';
 import SpreadsheetGrid from '@/components/spreadsheet/Grid';
 import { MasterDataRow, CellAddress } from '@/components/spreadsheet/types';
+import type { SheetData } from '@/lib/db';
 import Header from '@/components/sheets/Header';
 import MetadataPanel from '@/components/sheets/MetadataPanel';
 import FormulaBar from '@/components/sheets/FormulaBar';
@@ -218,7 +219,8 @@ export default function SheetEditorPage() {
       const data = await res.json();
       if (cancelled) return;
       const sheet = data.sheet;
-      const s = sheet?.data ?? {};
+      const s: Partial<SheetData> & { comments?: unknown; currentStage?: unknown } =
+        (sheet?.data ?? {}) as Partial<SheetData> & { comments?: unknown; currentStage?: unknown };
       setTitle(sheet?.title || '未命名');
       setActiveSheet(s.activeSheet ?? '综合');
       setMasterData(Array.isArray(s.masterData) ? s.masterData : makeBlankRows());
@@ -231,21 +233,26 @@ export default function SheetEditorPage() {
       });
       // Normalize comments to plain strings to avoid rendering objects
       const normalizedComments: string[] = Array.isArray(s.comments)
-        ? (s.comments as any[]).map((v) => {
-            if (typeof v === 'string') return v;
-            if (v && typeof (v as any).text === 'string') return String((v as any).text);
-            try { return String(v); } catch { return ''; }
-          }).filter((v) => typeof v === 'string')
+        ? (s.comments as unknown[])
+            .map((v): string => {
+              if (typeof v === 'string') return v;
+              if (v && typeof v === 'object' && 'text' in (v as Record<string, unknown>)) {
+                const text = (v as Record<string, unknown>).text;
+                return typeof text === 'string' ? text : '';
+              }
+              return '';
+            })
+            .filter((v): v is string => typeof v === 'string' && v.length > 0)
         : [];
       setComments(normalizedComments);
 
       // Ensure stage is a string (some old data may store objects like { kind, text })
-      const incomingStage: any = (s as any).currentStage;
+      const incomingStage: unknown = s.currentStage;
       const normalizedStage: InternalStage | null =
         typeof incomingStage === 'string'
           ? (incomingStage as InternalStage)
-          : (incomingStage && typeof incomingStage.text === 'string'
-              ? (incomingStage.text as InternalStage)
+          : (incomingStage && typeof incomingStage === 'object' && 'text' in (incomingStage as Record<string, unknown>)
+              ? ((incomingStage as Record<string, unknown>).text as InternalStage)
               : null);
       setCurrentStage(normalizedStage);
       setLoaded(true);
@@ -281,7 +288,7 @@ export default function SheetEditorPage() {
 
   // Create sheet on first meaningful cell input
   const creatingRef = useRef(false);
-  const createIfDraft = async (): Promise<string> => {
+  const createIfDraft = useCallback(async (): Promise<string> => {
     if (sheetId !== 'new' || creatingRef.current) return sheetId;
     creatingRef.current = true;
     try {
@@ -293,8 +300,14 @@ export default function SheetEditorPage() {
           data: { activeSheet, masterData, comprehensiveData, outsourcingData, shippingData, comments, currentStage }
         })
       });
-      const data = await res.json().catch(() => ({} as any));
-      const newId = data?.sheet?.id as string | undefined;
+      const dataUnknown: unknown = await res.json().catch(() => ({}));
+      let newId: string | undefined = undefined;
+      if (dataUnknown && typeof dataUnknown === 'object' && 'sheet' in dataUnknown) {
+        const sheetObj = (dataUnknown as { sheet?: unknown }).sheet;
+        if (sheetObj && typeof sheetObj === 'object' && 'id' in sheetObj) {
+          newId = (sheetObj as { id?: string }).id;
+        }
+      }
       if (newId) {
         setSheetId(newId);
         router.replace(`/sheets/${newId}`);
@@ -304,7 +317,7 @@ export default function SheetEditorPage() {
     } finally {
       creatingRef.current = false;
     }
-  };
+  }, [sheetId, title, activeSheet, masterData, comprehensiveData, outsourcingData, shippingData, comments, currentStage, router]);
 
   // Detect any non-empty cell to trigger creation (avoids saving untouched drafts)
   useEffect(() => {
@@ -317,7 +330,7 @@ export default function SheetEditorPage() {
       });
     });
     if (hasAnyCell) void createIfDraft();
-  }, [loaded, sheetId, masterData]);
+  }, [loaded, sheetId, masterData, createIfDraft]);
 
   // --- GRID helpers ---
   const isCellInSelection = (row: number, col: number) => {
@@ -328,7 +341,7 @@ export default function SheetEditorPage() {
     return row >= startRow && row <= endRow && col >= startCol && col <= endCol;
   };
 
-  const updateMasterData = (rowIndex: number, columnKey: keyof MasterDataRow, value: any) => {
+  const updateMasterData = (rowIndex: number, columnKey: keyof MasterDataRow, value: MasterDataRow[keyof MasterDataRow]) => {
     setMasterData(prev => {
       const next = [...prev];
       next[rowIndex] = { ...next[rowIndex], [columnKey]: value } as MasterDataRow;

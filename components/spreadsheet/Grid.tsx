@@ -22,7 +22,7 @@ interface SpreadsheetGridProps {
   extraCols?: number;
 
   isCellInSelection: (row: number, col: number) => boolean;
-  onDataChange: (rowIndex: number, columnKey: keyof MasterDataRow, value: any) => void;
+  onDataChange: (rowIndex: number, columnKey: keyof MasterDataRow, value: MasterDataRow[keyof MasterDataRow]) => void;
 
   onMouseDown: (e: MouseEvent, row: number, col: number) => void;
   onMouseEnter: (row: number, col: number) => void;
@@ -132,7 +132,7 @@ type CellProps = {
   onMouseEnter: () => void;
   onDoubleClick: () => void;
 
-  onValueChange: (value: any) => void;
+  onValueChange: (value: MasterDataRow[keyof MasterDataRow]) => void;
   onEditBufferChange: (value: string) => void;
   onCommit: (move?: 'down' | 'right' | 'left' | 'up') => void;
   onCancel: () => void;
