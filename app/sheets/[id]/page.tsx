@@ -482,6 +482,14 @@ export default function SheetEditorPage() {
     }
   };
 
+  const blobToDataURL = (blob: Blob): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+
   const uploadImageBlob = async (blob: Blob, sid: string): Promise<string> => {
     const res = await fetch('/api/uploads', {
       method: 'POST',
@@ -513,8 +521,8 @@ export default function SheetEditorPage() {
       const file = imageItem.getAsFile();
       if (file) {
         const optimized = await optimizeImageBlob(file);
-        // Show immediate preview via object URL
-        const previewUrl = URL.createObjectURL(optimized);
+        // Show immediate preview via data URL (avoids blob: CSP issues)
+        const previewUrl = await blobToDataURL(optimized);
         const { row, col } = activeCell;
         const columnKey = visibleColumns[col].key as keyof MasterDataRow;
         const cellKey = getCellKey(row, col);
