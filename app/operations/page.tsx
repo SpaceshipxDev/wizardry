@@ -85,6 +85,7 @@ const OperationsPage: NextPage = () => {
   const [activeIdx, setActiveIdx] = useState<number>(-1);
   const [searching, setSearching] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [navigating, setNavigating] = useState(false);
 
   const refresh = async () => {
     setLoading(true);
@@ -208,10 +209,10 @@ const OperationsPage: NextPage = () => {
                     <div className="px-4 py-6 text-sm text-gray-500 text-center">无匹配</div>
                   )}
                   {!searching && results.map((r, idx) => (
-                    <button
+                  <button
                       key={r.id}
                       onMouseDown={(e) => { e.preventDefault(); }}
-                      onClick={() => { router.push(`/sheets/${r.id}`); setOpen(false); }}
+                      onClick={() => { setNavigating(true); router.push(`/sheets/${r.id}`); setOpen(false); }}
                       onMouseEnter={() => setActiveIdx(idx)}
                       className={`w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition ${idx === activeIdx ? 'bg-gray-50' : ''}`}
                     >
@@ -273,14 +274,14 @@ const OperationsPage: NextPage = () => {
                 dueDate={item.dueDate}
                 lastOpened={formatLastOpened(item.updated_at)}
                 currentStage={item.currentStage}
-                onClick={() => router.push(`/sheets/${item.id}`)}
+                onClick={() => { setNavigating(true); router.push(`/sheets/${item.id}`); }}
               />
             ))}
           </div>
         </div>
       </main>
 
-      {loading && (
+      {(loading || navigating) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/60 backdrop-blur-sm">
           <div className="h-12 w-12 rounded-full border-4 border-gray-200 border-t-[#1A73E8] animate-spin" />
         </div>
