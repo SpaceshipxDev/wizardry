@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
   const buf = Buffer.from(bytes);
   if (buf.length === 0) return new Response('Empty body', { status: 400 });
 
-  const uploadsDir = path.join(process.cwd(), 'public', 'uploads', sheetId);
+  const uploadsDir = path.join(process.cwd(), 'data', 'uploads', sheetId);
   ensureDir(uploadsDir);
   const ext = extFromMime(ct);
   const fileName = `${randomUUID()}${ext}`;
@@ -50,4 +50,3 @@ export async function POST(req: NextRequest) {
   const urlPath = `/uploads/${sheetId}/${fileName}`;
   return Response.json({ url: urlPath });
 }
-

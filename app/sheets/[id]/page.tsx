@@ -186,6 +186,9 @@ export default function SheetEditorPage() {
   const [editBuffer, setEditBuffer] = useState<string>('');
   const [isDragging, setIsDragging] = useState(false);
   const gridContainerRef = useRef<HTMLDivElement>(null);
+  // Track temporary object URLs for fast image previews; revoke on replace/unmount
+  const objectUrlMapRef = useRef<Map<string, string>>(new Map());
+  const getCellKey = (row: number, col: number) => `${row}:${col}`;
 
   // --- DERIVED ---
   const visibleColumns = sheetConfiguration[activeSheet].columns;
@@ -509,13 +512,34 @@ export default function SheetEditorPage() {
     if (imageItem) {
       const file = imageItem.getAsFile();
       if (file) {
-        // Optimize client-side to reduce size, then upload and store URL (not base64)
         const optimized = await optimizeImageBlob(file);
-        const sid = await createIfDraft();
-        const url = await uploadImageBlob(optimized, sid);
+        // Show immediate preview via object URL
+        const previewUrl = URL.createObjectURL(optimized);
         const { row, col } = activeCell;
         const columnKey = visibleColumns[col].key as keyof MasterDataRow;
-        updateMasterData(row, columnKey, url);
+        const cellKey = getCellKey(row, col);
+
+        // Replace any existing preview for this cell
+        const prev = objectUrlMapRef.current.get(cellKey);
+        if (prev) {
+          try { URL.revokeObjectURL(prev); } catch {}
+        }
+        objectUrlMapRef.current.set(cellKey, previewUrl);
+        updateMasterData(row, columnKey, previewUrl);
+
+        // Upload in background and swap with permanent URL
+        try {
+          const sid = await createIfDraft();
+          const url = await uploadImageBlob(optimized, sid);
+          updateMasterData(row, columnKey, url);
+          const curr = objectUrlMapRef.current.get(cellKey);
+          if (curr) {
+            try { URL.revokeObjectURL(curr); } catch {}
+            objectUrlMapRef.current.delete(cellKey);
+          }
+        } catch {
+          // Keep preview; user can retry later
+        }
       }
       return;
     }
@@ -557,13 +581,15 @@ export default function SheetEditorPage() {
     };
   }, []);
   useEffect(() => { if (!editingCell) gridContainerRef.current?.focus(); }, [activeCell, editingCell]);
-  useEffect(() => () => {
-    masterData.forEach(row => {
-      Object.values(row).forEach(value => {
-        if (typeof value === 'string' && value.startsWith('blob:')) URL.revokeObjectURL(value);
+  // Revoke any remaining object URLs on unmount
+  useEffect(() => {
+    return () => {
+      objectUrlMapRef.current.forEach((url) => {
+        try { URL.revokeObjectURL(url); } catch {}
       });
-    });
-  }, [masterData]);
+      objectUrlMapRef.current.clear();
+    };
+  }, []);
 
   // After returning from print/dialog or tab switch, force a lightweight repaint
   // to avoid rare compositor glitches (seen on macOS/Chrome/Safari with many sticky cells)
