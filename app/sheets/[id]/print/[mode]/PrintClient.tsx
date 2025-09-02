@@ -37,40 +37,39 @@ export default function PrintClient({ sheet, mode }: { sheet: SheetRow; mode: 'o
     const hasContent = r.productName || r.productNumber || r.material || r.quantity || r.remarks;
     return (mode === 'outsourcing' ? r.isOutsourced : true) && hasContent;
   });
-  const data = mode === 'outsourcing' ? sheet.data.outsourcingData : sheet.data.shippingData;
   const title = mode === 'outsourcing' ? '外协单' : '送货单';
 
   return (
     <div className="p-6 text-sm">
-      <h1 className="text-2xl font-bold text-center mb-2">{data.ourCompany || '杭州越侬模型科技有限公司'}</h1>
+      <h1 className="text-2xl font-bold text-center mb-2">{(mode === 'outsourcing' ? sheet.data.outsourcingData.ourCompany : sheet.data.shippingData.ourCompany) || '杭州越侬模型科技有限公司'}</h1>
       <h2 className="text-lg font-semibold text-center mb-4">{title}</h2>
 
       <div className="mb-4 space-y-1">
         {mode === 'outsourcing' ? (
           <>
-            <div>对方名称：{data.counterpartName}</div>
-            <div>对方联系人：{data.counterpartContact}</div>
-            <div>外协单号：{data.outsourceOrderNumber}</div>
-            <div>寄出时间：{data.dispatchDate}</div>
-            <div>寄回时间：{data.returnDate}</div>
-            <div>订单金额：{data.orderAmount}</div>
-            <div>我方：{data.ourCompany}</div>
-            <div>我方收件地址：{data.ourAddress}</div>
-            <div>我方联系人：{data.ourContact}</div>
-            <div>备注：{data.remarks}</div>
+            <div>对方名称：{sheet.data.outsourcingData.counterpartName}</div>
+            <div>对方联系人：{sheet.data.outsourcingData.counterpartContact}</div>
+            <div>外协单号：{sheet.data.outsourcingData.outsourceOrderNumber}</div>
+            <div>寄出时间：{sheet.data.outsourcingData.dispatchDate}</div>
+            <div>寄回时间：{sheet.data.outsourcingData.returnDate}</div>
+            <div>订单金额：{sheet.data.outsourcingData.orderAmount}</div>
+            <div>我方：{sheet.data.outsourcingData.ourCompany}</div>
+            <div>我方收件地址：{sheet.data.outsourcingData.ourAddress}</div>
+            <div>我方联系人：{sheet.data.outsourcingData.ourContact}</div>
+            <div>备注：{sheet.data.outsourcingData.remarks}</div>
           </>
         ) : (
           <>
-            <div>客户名称：{data.customerName}</div>
-            <div>客户联系人：{data.customerContact}</div>
-            <div>联系方式：{data.contactPhone}</div>
-            <div>生产单号：{data.productionOrderNumber}</div>
-            <div>合同编号：{data.contractNumber}</div>
-            <div>送货日期：{data.deliveryDate}</div>
-            <div>货品总数：{data.totalProductCount}</div>
-            <div>我方：{data.ourCompany}</div>
-            <div>我方联系人：{data.ourContact}</div>
-            <div>备注：{data.remarks}</div>
+            <div>客户名称：{sheet.data.shippingData.customerName}</div>
+            <div>客户联系人：{sheet.data.shippingData.customerContact}</div>
+            <div>联系方式：{sheet.data.shippingData.contactPhone}</div>
+            <div>生产单号：{sheet.data.shippingData.productionOrderNumber}</div>
+            <div>合同编号：{sheet.data.shippingData.contractNumber}</div>
+            <div>送货日期：{sheet.data.shippingData.deliveryDate}</div>
+            <div>货品总数：{sheet.data.shippingData.totalProductCount}</div>
+            <div>我方：{sheet.data.shippingData.ourCompany}</div>
+            <div>我方联系人：{sheet.data.shippingData.ourContact}</div>
+            <div>备注：{sheet.data.shippingData.remarks}</div>
           </>
         )}
       </div>

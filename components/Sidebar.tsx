@@ -21,7 +21,7 @@ const DriveIcon = ({ className }: { className?: string }) => (
 interface SidebarLinkProps {
   href: string;
   label: string;
-  icon: React.ReactElement;
+  icon: React.ReactElement<{ className?: string }>;
   onClick: () => void;
 }
 const SidebarLink = ({ href, label, icon, onClick }: SidebarLinkProps) => {

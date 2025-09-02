@@ -24,7 +24,7 @@ type InternalStage =
   | '检验'
   | '已出货';
 
-const STAGES: InternalStage[] = ['待生产', '分析', '编程', '操机', '手工', '表面处理', '检验', '已完成'];
+const STAGES: InternalStage[] = ['待生产', '分析', '编程', '操机', '手工', '表面处理', '检验', '已出货'];
 
 // Comments remain simple strings; stage is tracked separately
 
@@ -383,9 +383,9 @@ export default function SheetEditorPage() {
     setShowStagePicker(false);
   };
 
-  const handleSelectStage = (stage: InternalStage) => {
+  const handleSelectStage = (stage: string) => {
     // Do not commit yet; wait until user clicks Comment
-    setPendingStage(stage);
+    setPendingStage(stage as InternalStage);
   };
 
   const handleGridKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
