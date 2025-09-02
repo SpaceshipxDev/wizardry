@@ -49,8 +49,8 @@ export default function SpreadsheetGrid(props: SpreadsheetGridProps) {
               key={c.key}
               className={`cell-header w-32 h-10 flex-shrink-0 font-semibold ${isSpecific && props.highlightSpecific ? 'sheet-specific-glow' : ''}`}
             >
-              <div className="inline-flex items-center gap-1.5" title={isGlobal ? 'Global field' : undefined}>
-                {isGlobal && <span className="global-indicator" aria-label="Global field" />}
+              <div className="inline-flex items-center gap-1.5" title={isGlobal ? '全局字段' : undefined}>
+                {isGlobal && <span className="global-indicator" aria-label="全局字段" />}
                 <span>{c.header}</span>
               </div>
             </div>
@@ -238,7 +238,7 @@ function Cell({
         v.startsWith('http://') ||
         v.startsWith('https://');
       if (isImg) {
-        return <img src={v} alt="image" className="w-full h-full object-contain" />;
+        return <img src={v} alt="图片" className="w-full h-full object-contain" />;
       }
     }
     return String(value ?? '');

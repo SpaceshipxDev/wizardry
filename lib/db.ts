@@ -31,6 +31,9 @@ export type SheetData = {
     ourContact: string; // 我方联系人
     remarks: string; // 备注
   };
+  // Minimal workflow metadata stored with the sheet
+  comments?: string[];
+  currentStage?: string | null;
 };
 
 export type SheetRow = {
@@ -101,6 +104,9 @@ export function createDefaultSheetData(): SheetData {
       ourContact: '',
       remarks: '',
     },
+    // Default minimal workflow metadata
+    comments: [],
+    currentStage: null,
   };
 }
 
